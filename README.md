@@ -17,7 +17,7 @@ If the laptop reloads or the browser closes, open the page again and choose **Re
 
 A static site: `index.html` (layout and styles), `content.js` (every card, question and step), `app.js` (stage and phone views), `live.js` (live connection), `tekeningen.js` (drawings), `qr.js` (QR code generator, MIT licence), `fonts/` (Zilla Slab and Poppins, SIL Open Font License).
 
-**Live connection.** Every message is encrypted on the device (AES-GCM, key derived from the session code) and sent through public relay servers that only see unreadable text. There is no database: the host's laptop keeps the session. Messages go out on three relays at once (two MQTT brokers and ntfy, see `config.js`), so the session keeps running when one is slow, blocked or rate-limited. ntfy on its own cannot carry 22 phones on one office network: it allows 60 requests in a burst per network address, then one every five seconds.
+**Live connection.** Every message is encrypted on the device (AES-GCM, key derived from the session code) and sent through public relay servers that only see unreadable text. There is no database: the host's laptop keeps the session. Messages go out on five relays ("routes") at once: four free public MQTT brokers and ntfy, see `config.js`. The session keeps running as long as one MQTT route works; the others are spare for when a broker is down or blocked on a network. **Check the connection on this network** on the start page tests every route from where you are. ntfy on its own cannot carry 22 phones on one office network: it allows 60 requests in a burst per network address, then one every five seconds.
 
 **Changing the content.** Edit `content.js`. Cards have an `id`; the default card per step is set in `STEPS`.
 

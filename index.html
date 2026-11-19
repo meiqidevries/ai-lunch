@@ -83,6 +83,12 @@ input[type=text]:focus,textarea:focus{border-color:var(--teal);outline:none}
 .door .head{margin:-1.25rem -1.25rem 0;padding:.625rem 1.25rem;background:var(--pale);border-bottom:1px solid var(--line)}
 .door .head.solid{background:var(--teal)} .door .head.solid .lab{color:var(--on-teal)}
 .codein{font-family:var(--slab);font-size:1.75rem!important;letter-spacing:.12em;text-transform:uppercase;text-align:center}
+.probe{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.375rem;font-size:.875rem}
+.probe li{display:grid;grid-template-columns:.625rem minmax(0,1fr);column-gap:.625rem;align-items:center}
+.probe li span:last-child{grid-column:2;color:var(--soft);font-size:.8125rem}
+.probe b{font-weight:500;overflow-wrap:anywhere}
+.verdict{margin-top:.75rem;padding:.625rem .75rem;border-radius:.375rem;font-size:.875rem;background:var(--pale);border-left:4px solid var(--teal)}
+.verdict.meh{border-left-color:var(--orange)} .verdict.bad{border-left-color:var(--red)}
 .foot{font-size:.8125rem;color:var(--soft);display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap}
 .brand{font-family:var(--sans);font-weight:600;letter-spacing:.08em;color:var(--teal-ink);font-size:.8125rem}
 
@@ -374,6 +380,8 @@ html.host body{overflow:hidden}
       <div id="resume" hidden></div>
       <button class="btn main wide" type="button" id="hoststart">Start a new session</button>
       <p class="note">Practise first: start a session and open the join link on your own phone.</p>
+      <button class="btn quiet" type="button" id="probe">Check the connection on this network</button>
+      <div id="probeout" hidden></div>
     </section>
   </div>
   <p class="foot"><span>Answers are encrypted on the device and never stored on a server. Nobody, including the host, can see who answered what.</span><span class="brand">JOINSON&amp;SPICE</span></p>

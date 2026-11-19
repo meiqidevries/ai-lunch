@@ -354,7 +354,8 @@
     $('s-skip').hidden = !(L.level(H.i) < maxLevel(STEPS[H.i]) && H.i < STEPS.length - 1);
     $('s-skip').title = H.i < STEPS.length - 1 ? 'Go to: ' + STEPS[H.i + 1].title : '';
     var st = L.status();
-    $('s-chan').innerHTML = '<span class="dot ' + (st.up === st.of ? 'ok' : st.up ? 'warn' : 'bad') + '"></span>' + st.up + '/' + st.of + ' relays';
+    $('s-chan').innerHTML = routesLabel(st);
+    $('s-chan').title = st.names.map(function (n) { return (n.up ? '● ' : '○ ') + n.name; }).join('\n');
   }
   function advance() {
     var st = STEPS[H.i], lv = L.level(H.i);
@@ -729,6 +730,13 @@
      PHONE (participant)
      ===================================================================== */
   var P = { i: -1, refresh: null, words: '', why: {}, pad: null, ideaG: null };
+  // Two working routes are plenty. Only one MQTT route or ntfy alone is worth a warning.
+  function routesLabel(st) {
+    var mq = st.names.filter(function (n) { return n.up && n.type === 'mqtt'; }).length;
+    var cls = st.up >= 2 && mq >= 1 ? 'ok' : st.up ? 'warn' : 'bad';
+    var txt = !st.up ? 'No connection' : cls === 'ok' ? 'Connected · ' + st.up + ' routes' : 'Connected · ' + st.up + (st.up === 1 ? ' route' : ' routes') + ', check the network';
+    return '<span class="dot ' + cls + '"></span>' + txt;
+  }
   function pStatus() {
     var st = L.status(), s = L.session(), b = $('p-status');
     var cls = !s ? 'bad' : st.up ? (st.waiting ? 'warn' : 'ok') : 'bad';
@@ -1053,6 +1061,24 @@
   }
   $('hoststart').addEventListener('click', function () { L.forget(); try { localStorage.removeItem('lunch.summary'); } catch (e) {} hostGo(null); });
   document.addEventListener('click', function (e) { if (e.target.id === 'hostresume') hostGo(L.saved()); });
+  var stopProbe = null;
+  $('probe').addEventListener('click', function () {
+    if (stopProbe) stopProbe();
+    var out = $('probeout'); out.hidden = false; this.textContent = 'Check again';
+    stopProbe = L.probe(function (res) {
+      var ok = res.filter(function (r) { return r.state === 'ok'; }), busy = res.some(function (r) { return r.state === 'connecting' || r.state === 'sending'; });
+      var mq = ok.filter(function (r) { return r.type === 'mqtt'; }).length;
+      var h = '<ul class="probe">' + res.map(function (r) {
+        var lbl = { connecting: 'connecting…', sending: 'testing…', ok: 'works · ' + r.ms + ' ms', noecho: 'connects, but messages don’t come back', fail: 'not reachable from this network' }[r.state];
+        return '<li class="' + r.state + '"><span class="dot ' + (r.state === 'ok' ? 'ok' : (r.state === 'fail' || r.state === 'noecho') ? 'bad' : '') + '"></span><b>' + esc(r.name) + '</b><span>' + lbl + '</span></li>';
+      }).join('') + '</ul>';
+      if (!busy) h += '<p class="verdict ' + (ok.length >= 2 && mq ? 'good' : ok.length ? 'meh' : 'bad') + '">' + (ok.length >= 2 && mq ? 'Good to go: ' + ok.length + ' of ' + res.length + ' routes work on this network. That leaves plenty to spare.'
+        : mq ? 'It will work, on one route. Run the check again just before the session; if it stays at one, ask people to use mobile data.'
+        : ok.length ? 'Only ntfy works here. That is not enough for a full room on one network: ask everyone to switch off wifi and use mobile data.'
+        : 'Nothing gets through from this network. Try mobile data, or another network.') + '</p>';
+      out.innerHTML = h;
+    });
+  });
   $('joinform').addEventListener('submit', function (e) {
     e.preventDefault();
     var c = L.normCode($('joincode').value);

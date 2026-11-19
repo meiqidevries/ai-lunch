@@ -15,8 +15,10 @@
   'use strict';
 
   var DEFAULT_CHANNELS = [
-    { type: 'mqtt', url: 'wss://mqtt.eclipseprojects.io/mqtt' },
     { type: 'mqtt', url: 'wss://broker.emqx.io:8084/mqtt' },
+    { type: 'mqtt', url: 'wss://broker.hivemq.com:8884/mqtt' },
+    { type: 'mqtt', url: 'wss://test.mosquitto.org:8081' },
+    { type: 'mqtt', url: 'wss://mqtt.eclipseprojects.io/mqtt' },
     { type: 'ntfy', url: 'https://ntfy.sh' }
   ];
   var CHANNELS = (window.LUNCH_CONFIG && window.LUNCH_CONFIG.channels) || DEFAULT_CHANNELS;
@@ -93,7 +95,7 @@
   // ntfy: publish with POST, listen with server-sent events.
   function NtfyChannel(url, topic, onFrame, onState) {
     var self = this, es = null, closed = false, retry = null, pause = 0;
-    self.name = url.replace(/^https?:\/\//, ''); self.up = false;
+    self.name = url.replace(/^https?:\/\//, ''); self.type = 'ntfy'; self.up = false;
     function setUp(v) { if (self.up !== v) { self.up = v; onState(); } }
     function listen() {
       if (closed) return;
@@ -123,7 +125,7 @@
   function MqttChannel(url, topic, onFrame, onState) {
     var self = this, ws = null, closed = false, retry = null, ping = null, wait = null, buf = new Uint8Array(0), tries = 0, lastRx = 0;
     var path = 'jslunch/' + topic;
-    self.name = url.replace(/^wss?:\/\//, '').replace(/\/.*$/, ''); self.up = false;
+    self.name = url.replace(/^wss?:\/\//, '').replace(/\/.*$/, ''); self.type = 'mqtt'; self.up = false;
     function setUp(v) { if (self.up !== v) { self.up = v; onState(); } }
     function str(s) { var b = enc.encode(s); return [b.length >> 8, b.length & 255].concat(Array.prototype.slice.call(b)); }
     function packet(type, body) {
@@ -535,10 +537,37 @@
   function mine(step, kind) { return items(step, kind).filter(function (x) { return x.mine; }); }
   function hostValue(step, kind) { var l = items(step, kind); return l.length ? l[l.length - 1].v : ''; }
   function participants() { return S && S.host ? Object.keys(S.who).filter(function (id) { return id !== S.me; }) : []; }
+  // Connection check: for every relay, connect, send a test message and wait for it to come back.
+  function probe(onUpdate) {
+    var topic = 'probe' + random(16, 'abcdefghijkmnpqrstuvwxyz23456789'), res = [], chans = [];
+    CHANNELS.forEach(function (c) {
+      var Ctor = c.type === 'mqtt' ? MqttChannel : c.type === 'ntfy' ? NtfyChannel : null;
+      if (!Ctor) return;
+      var r = { name: c.url.replace(/^(wss?|https?):\/\//, '').replace(/\/.*$/, ''), type: c.type, state: 'connecting', ms: 0 };
+      var token = 'ping' + random(12, ALPHABET), t0 = 0, done = false, ch = null;
+      res.push(r);
+      function finish(state) {
+        if (done) return; done = true; r.state = state; onUpdate(res);
+        setTimeout(function () { try { if (ch) ch.close(); } catch (e) {} }, 50);
+      }
+      try {
+        ch = new Ctor(c.url, topic, function (f) { if (f === token && t0) { r.ms = Date.now() - t0; finish('ok'); } }, function () {
+          if (ch && ch.up && !t0) {
+            t0 = Date.now(); r.state = 'sending'; onUpdate(res);
+            ch.send(token).catch(function () { finish('fail'); });
+          }
+        });
+        chans.push(ch);
+      } catch (e) { finish('fail'); }
+      setTimeout(function () { finish(t0 ? 'noecho' : 'fail'); }, 12000);
+    });
+    onUpdate(res);
+    return function () { chans.forEach(function (c) { try { c.close(); } catch (e) {} }); };
+  }
   function status() {
     if (!S) return { up: 0, of: 0, names: [] };
     return { up: S.channels.filter(function (c) { return c.up; }).length, of: S.channels.length,
-      names: S.channels.map(function (c) { return { name: c.name, up: c.up }; }), waiting: S.waiting, problem: S.problem };
+      names: S.channels.map(function (c) { return { name: c.name, up: c.up, type: c.type }; }), waiting: S.waiting, problem: S.problem };
   }
   function hostNow() { return Date.now() + (S && !S.host ? S.skew : 0); }
 
@@ -547,7 +576,7 @@
     start: start, join: join, stop: stop, close: close,
     setStep: setStep, reveal: reveal, level: level, put: put, add: add, remove: remove,
     items: items, mine: mine, hostValue: hostValue, participants: participants, people: people,
-    status: status, hostNow: hostNow, resend: hello,
+    status: status, hostNow: hostNow, resend: hello, probe: probe,
     session: function () { return S; },
     on: function (fn) { listeners.push(fn); },
     MAX_ADD: MAX_ADD
