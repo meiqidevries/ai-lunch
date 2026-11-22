@@ -36,7 +36,7 @@
   // Kinds of input and how long a value may be. Generous on purpose: nobody should hit a limit.
   var KINDS = {
     w: 60, xy: 16, use: 1000, tool: 1000, usetext: 8000, vote: 16, why: 12000,
-    idea: 12000, dots: 600, fu: 16, topic: 1000, text: 12000,
+    idea: 12000, dots: 600, fu: 16, topic: 1000, text: 12000, toolother: 2000, topicother: 6000,
     // host only
     pick: 16, groups: 6000, clock: 40, agreed: 6000
   };

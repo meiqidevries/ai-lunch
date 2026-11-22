@@ -64,6 +64,25 @@
     }
     document.body.appendChild(c); setTimeout(function () { c.remove(); }, 3200);
   }
+  // two party poppers firing from the bottom corners
+  function poppers() {
+    if (RUSTIG || !document.body.animate) return;
+    var c = document.createElement('div'), cols = ['#00A99D', '#E07B2E', '#7E5BB5', '#2F6FAE', '#B38609', '#C8463C'];
+    c.className = 'confetti'; document.body.appendChild(c);
+    [0, 1].forEach(function (side) {
+      for (var k = 0; k < 48; k++) {
+        var p = document.createElement('i'), dx = (side ? -1 : 1) * (12 + Math.random() * 42), up = 40 + Math.random() * 50, rot = Math.random() * 720;
+        p.style.cssText = 'top:auto;bottom:-1rem;animation:none;background:' + cols[k % cols.length] + ';' + (side ? 'right:3vw' : 'left:3vw') + (k % 3 ? '' : ';border-radius:50%;height:.6rem');
+        c.appendChild(p);
+        p.animate([
+          { transform: 'translate(0,0) rotate(0deg)' },
+          { transform: 'translate(' + dx + 'vw,-' + up + 'vh) rotate(' + rot + 'deg)', offset: .4 },
+          { transform: 'translate(' + (dx * 1.3) + 'vw,8vh) rotate(' + (rot * 2) + 'deg)' }
+        ], { duration: 2300 + Math.random() * 900, easing: 'cubic-bezier(.15,.75,.4,1)', fill: 'forwards', delay: Math.random() * 180 });
+      }
+    });
+    setTimeout(function () { c.remove(); }, 3800);
+  }
   function flash(e) { if (!e || RUSTIG) return; e.classList.remove('flash'); void e.offsetWidth; e.classList.add('flash'); }
   function buzz(p) { try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {} }
   function bars(rows, total, opts) {
@@ -163,6 +182,7 @@
     kinds.forEach(function (k) { L.items(i, k).forEach(function (it) { who[it.c] = 1; }); });
     return Object.keys(who).length;
   }
+  function texts(i, kind) { return L.items(i, kind).map(function (it) { return { id: it.id, v: it.v.trim() }; }).filter(function (x) { return x.v; }); }
   function maxLevel(st) {
     return { words: 1, matrix: 1, using: 1, card: 2, ideas: 1, rank: 1, close: 1 }[st.type] || 0;
   }
@@ -277,12 +297,13 @@
     var pts = Object.keys(points()).map(function (k) { return points()[k]; }), qn = {};
     pts.forEach(function (p) { var q = quadOf(p.x, p.y); qn[q] = (qn[q] || 0) + 1; });
     out.push('## Where we stand', ['pi', 'te', 'be', 'gu'].map(function (id) { return QBY[id].name + ': ' + (qn[id] || 0); }).join(' · '), '');
-    var iu = idx('using'), uses = [0, 0, 0, 0, 0, 0, 0, 0], tools = [0, 0, 0, 0, 0, 0, 0, 0];
+    var iu = idx('using'), uses = C.USES.map(function () { return 0; }), tools = C.TOOLS.map(function () { return 0; });
     L.items(iu, 'use').forEach(function (it) { parse(it.v, []).forEach(function (k) { if (uses[k] != null) uses[k]++; }); });
     L.items(iu, 'tool').forEach(function (it) { parse(it.v, []).forEach(function (k) { if (tools[k] != null) tools[k]++; }); });
     out.push('## What we already use (' + respondents(iu, ['use', 'tool']) + ' answered)');
     C.USES.forEach(function (u, k) { out.push('- ' + u + ': ' + uses[k]); });
     out.push('', 'Tools: ' + C.TOOLS.map(function (t, k) { return t + ' ' + tools[k]; }).join(' · '));
+    var other = texts(iu, 'toolother'); if (other.length) out.push('Something else: ' + other.map(function (x) { return x.v; }).join('; '));
     L.items(iu, 'usetext').forEach(function (it) { if (it.v.trim()) out.push('> ' + it.v.trim().replace(/\n/g, ' ')); });
     out.push('');
     STEPS.forEach(function (st, i) {
@@ -298,15 +319,16 @@
       out.push('');
     });
     var r = ranked();
-    out.push('## AI tool ideas, ranked (' + plural(r.voters, 'person', 'people') + ' voted)');
-    if (!r.list.length) out.push('_No ideas_');
-    r.list.forEach(function (x, k) { out.push((k + 1) + '. **' + x.t + '** — ' + plural(x.dots, 'dot', 'dots') + ' · group ' + gName(x.g) + (x.w ? '\n   ' + x.w.replace(/\n+/g, ' ') : '')); });
+    out.push('## What people need to work better, ranked (' + plural(r.voters, 'person', 'people') + ' voted)');
+    if (!r.list.length) out.push('_Nothing raised_');
+    r.list.forEach(function (x, k) { out.push((k + 1) + '. **' + x.t + '** — ' + plural(x.dots, 'dot', 'dots') + ' · group ' + gName(x.g) + (x.w ? '\n   Why our current tools don’t solve it: ' + x.w.replace(/\n+/g, ' ') : '')); });
     out.push('');
     var ic = idx('close'), fu = { yes: 0, maybe: 0, no: 0 }, tp = C.TOPICS.map(function () { return 0; });
     L.items(ic, 'fu').forEach(function (it) { if (fu[it.v] != null) fu[it.v]++; });
     L.items(ic, 'topic').forEach(function (it) { parse(it.v, []).forEach(function (k) { if (tp[k] != null) tp[k]++; }); });
     out.push('## Follow-up', 'Worth a follow-up session? Yes ' + fu.yes + ' · Maybe ' + fu.maybe + ' · No ' + fu.no, '');
     C.TOPICS.forEach(function (t, k) { out.push('- ' + t + ': ' + tp[k]); });
+    texts(ic, 'topicother').forEach(function (x) { out.push('  - ' + x.v.replace(/\n+/g, ' ')); });
     out.push('', '_Session code ' + L.showCode(s ? s.code : '') + '. Nothing was stored on a server; this summary was made on the host laptop._');
     return out.join('\n');
   }
@@ -492,7 +514,8 @@
           L.items(i, 'tool').forEach(function (it) { parse(it.v, []).forEach(function (k) { if (tools[k] != null) tools[k]++; }); });
           var quotes = L.items(i, 'usetext').filter(function (it) { return it.v.trim(); });
           $('s-vis').innerHTML = '<div class="split"><div class="ask"><span class="lab">What for</span>' + bars(C.USES.map(function (u, k) { return { label: u, n: uses[k] }; }), n, { pct: false }) + '</div>' +
-            '<div class="ask"><span class="lab">Which tools</span>' + bars(C.TOOLS.map(function (u, k) { return { label: u, n: tools[k] }; }), n, { pct: false }) + '</div></div>' +
+            '<div class="ask"><span class="lab">Which tools</span>' + bars(C.TOOLS.map(function (u, k) { return { label: u, n: tools[k] }; }), n, { pct: false }) +
+            (texts(i, 'toolother').length ? '<div class="note">Something else: ' + texts(i, 'toolother').map(function (x) { return esc(x.v); }).join(' · ') + '</div>' : '') + '</div></div>' +
             (quotes.length ? '<span class="lab">Worth sharing</span><div class="reasons">' + quotes.map(function (q) { return '<div class="reason"><span>' + esc(q.v) + '</span>' + xBtn(q.id) + '</div>'; }).join('') + '</div>' : '');
         };
         break;
@@ -568,11 +591,11 @@
           var list = ideas(), per = {};
           list.forEach(function (x) { per[x.g] = (per[x.g] || 0) + 1; });
           var n = respondents(i, ['idea']); respondentsCache = function () { return n; };
-          $('s-counter').innerHTML = '<div class="counter"><span class="big">' + list.length + '</span><span class="sub">' + (list.length === 1 ? 'idea so far' : 'ideas so far') + '</span></div>';
+          $('s-counter').innerHTML = '<div class="counter"><span class="big">' + list.length + '</span><span class="sub">' + (list.length === 1 ? 'need so far' : 'needs so far') + '</span></div>';
           var gi = groupInfo();
           if (!L.level(i)) {
             var h3 = '<div class="sparks"><span class="lab">Stuck? Ask each other</span><div class="ask">' + C.SPARKS.map(function (a) { return '<p>' + esc(a) + '</p>'; }).join('') + '</div></div><div class="groupsgrid">';
-            for (var k = 0; k < Math.max(gi.n, 1); k++) h3 += '<div class="gbox" style="--g:' + gCol(gi.n ? k : -1) + '"><b>' + esc(gi.n ? gName(k) : 'Ideas') + '</b><span class="big" style="font-family:var(--slab);font-size:2.5rem;font-weight:700">' + (per[gi.n ? k : -1] || 0) + '</span><span>ideas</span></div>';
+            for (var k = 0; k < Math.max(gi.n, 1); k++) h3 += '<div class="gbox" style="--g:' + gCol(gi.n ? k : -1) + '"><b>' + esc(gi.n ? gName(k) : 'Needs') + '</b><span class="big" style="font-family:var(--slab);font-size:2.5rem;font-weight:700">' + (per[gi.n ? k : -1] || 0) + '</span><span>needs</span></div>';
             $('s-vis').innerHTML = h3 + '</div>';
           } else $('s-vis').innerHTML = boardHTML(list, gi, true);
           H.ideasClock();
@@ -592,14 +615,22 @@
         H.refresh = function (reveal) {
           var r = ranked(); respondentsCache = function () { return r.voters; };
           $('s-counter').innerHTML = counterHTML(r.voters, r.voters === 1 ? 'person has voted' : 'people have voted', i);
-          if (!L.level(i)) { $('s-vis').innerHTML = '<div class="waiting"><span class="big">' + r.voters + '</span><span>' + plural(r.list.length, 'idea', 'ideas') + ' on the ballot</span></div>'; return; }
+          if (!L.level(i)) { $('s-vis').innerHTML = '<div class="waiting"><span class="big">' + r.voters + '</span><span>' + plural(r.list.length, 'need', 'needs') + ' on the ballot</span></div>'; return; }
           var top = r.list.slice(0, 3), order = [1, 0, 2], hts = ['9rem', '6.5rem', '4.5rem'];
           var p = '<div class="podium' + (reveal ? ' reveal' : '') + '">';
           order.forEach(function (k) { var x = top[k]; if (!x) { p += '<div></div>'; return; } p += '<div class="pod"><b>' + esc(x.t) + '</b><span>' + esc(gName(x.g)) + ' · ' + plural(x.dots, 'dot', 'dots') + '</span><div class="blk" style="--g:' + gCol(x.g) + ';height:' + hts[k] + '">' + (k + 1) + '</div></div>'; });
           p += '</div>';
           var rest = r.list.map(function (x, k) { return { pre: '<b>' + (k + 1) + '.</b>', label: x.t + ' — ' + gName(x.g), n: x.dots, col: gCol(x.g) }; });
-          $('s-vis').innerHTML = p + '<span class="lab">All ideas</span>' + bars(rest, 0, {});
+          $('s-vis').innerHTML = p + '<span class="lab">All needs</span>' + bars(rest, 0, {});
         };
+        break;
+      }
+      case 'thanks': {
+        main.innerHTML = '<section class="lead enter"><span class="lab">' + esc(st.label) + '</span><p class="prompt" style="font-size:1.375rem">' + esc(st.prompt) + '</p>' +
+          '<div class="chips"><button class="btn" type="button" id="pop">Pop again</button><button class="btn" type="button" id="sum-copy">Copy summary</button><button class="btn" type="button" id="sum-dl">Download summary</button></div></section>' +
+          '<section class="visual center"><div class="thanks"><div class="thanksbig">Thank you!</div>' + tek(st.tek) + '</div></section>';
+        keepSummary();
+        if (!keepScroll) { poppers(); setTimeout(poppers, 1300); }
         break;
       }
       case 'close': {
@@ -612,14 +643,15 @@
           pts.forEach(function (c) { var p = points()[c]; var q = quadOf(p.x, p.y); qn[q] = (qn[q] || 0) + 1; });
           var bigQ = null; Object.keys(qn).forEach(function (q) { if (!bigQ || qn[q] > qn[bigQ]) bigQ = q; });
           var h4 = '<div class="stats reveal"><div class="stat"><b>' + L.people() + '</b><span>people took part</span></div><div class="stat"><b class="txt">' + (wl[0] ? esc(wl[0].text) : '—') + '</b><span>most-used word for AI</span></div>' +
-            '<div class="stat"><b class="txt">' + (bigQ ? esc(QBY[bigQ].name) : '—') + '</b><span>the biggest corner</span></div><div class="stat"><b>' + r.list.length + '</b><span>tool ideas</span></div></div>';
-          if (r.list.length) h4 += '<span class="lab">Top ideas</span><ol class="ask">' + r.list.slice(0, 3).map(function (x) { return '<p>' + esc(x.t) + ' <span class="soft small">· ' + plural(x.dots, 'dot', 'dots') + '</span></p>'; }).join('') + '</ol>';
+            '<div class="stat"><b class="txt">' + (bigQ ? esc(QBY[bigQ].name) : '—') + '</b><span>the biggest corner</span></div><div class="stat"><b>' + r.list.length + '</b><span>needs raised</span></div></div>';
+          if (r.list.length) h4 += '<span class="lab">What we need most</span><ol class="ask">' + r.list.slice(0, 3).map(function (x) { return '<p>' + esc(x.t) + ' <span class="soft small">· ' + plural(x.dots, 'dot', 'dots') + '</span></p>'; }).join('') + '</ol>';
           if (L.level(i)) {
             var fu = { yes: 0, maybe: 0, no: 0 }, tp = C.TOPICS.map(function () { return 0; });
             L.items(i, 'fu').forEach(function (it) { if (fu[it.v] != null) fu[it.v]++; });
             L.items(i, 'topic').forEach(function (it) { parse(it.v, []).forEach(function (k) { if (tp[k] != null) tp[k]++; }); });
             h4 += '<div class="split"><div class="ask"><span class="lab">A follow-up session?</span>' + bars([{ label: 'Yes', n: fu.yes }, { label: 'Maybe', n: fu.maybe }, { label: 'No', n: fu.no, col: 'var(--soft)' }], 0, {}) + '</div>' +
-              '<div class="ask"><span class="lab">About what?</span>' + bars(C.TOPICS.map(function (t, k) { return { label: t, n: tp[k] }; }), 0, {}) + '</div></div>';
+              '<div class="ask"><span class="lab">About what?</span>' + bars(C.TOPICS.map(function (t, k) { return { label: t, n: tp[k] }; }), 0, {}) +
+              (texts(i, 'topicother').length ? '<div class="note">Other: ' + texts(i, 'topicother').map(function (x) { return esc(x.v); }).join(' · ') + '</div>' : '') + '</div></div>';
           }
           $('s-vis').innerHTML = h4;
           keepSummary();
@@ -644,10 +676,10 @@
     var cols = {}, order = [];
     list.forEach(function (x) { if (!cols[x.g]) { cols[x.g] = []; order.push(x.g); } cols[x.g].push(x); });
     order.sort(function (a, b) { return a - b; });
-    if (!order.length) return '<div class="waiting"><span>No ideas yet.</span></div>';
+    if (!order.length) return '<div class="waiting"><span>Nothing raised yet.</span></div>';
     return '<div class="board reveal">' + order.map(function (g) {
       return '<div class="col' + (H.spot === g && host ? ' spot' : '') + '" style="--g:' + gCol(g) + '"><h3 ' + (host ? 'data-spot="' + g + '" role="button" tabindex="0"' : '') + '>' + esc(gName(g)) + '<span class="soft small">' + cols[g].length + '</span></h3>' +
-        cols[g].map(function (x) { return '<div class="idea"><div><b>' + esc(x.t) + '</b>' + (x.w ? '<span>' + esc(x.w) + '</span>' : '') + '</div>' + (host ? xBtn(x.id) : '') + '</div>'; }).join('') + '</div>';
+        cols[g].map(function (x) { return '<div class="idea"><div><b>' + esc(x.t) + '</b>' + (x.w ? '<span><em>Why not today:</em> ' + esc(x.w) + '</span>' : '') + '</div>' + (host ? xBtn(x.id) : '') + '</div>'; }).join('') + '</div>';
     }).join('') + '</div>';
   }
 
@@ -693,6 +725,7 @@
         L.put(j, 'clock', String((e2 > Date.now() ? e2 : Date.now()) + 60000)); break;
       }
       case 'sum-copy': copy(summary(), 'Summary copied'); break;
+      case 'pop': poppers(); break;
       case 'sum-dl': download('ai-lunch-summary.md', summary()); break;
     }
   });
@@ -805,11 +838,14 @@
         break;
       case 'using': {
         main.innerHTML = '<section class="card pcard enter">' + head + '<h2>' + esc(st.title) + '</h2><p>' + esc(st.prompt) + '</p><span class="lab">What for</span><div class="chips" id="p-uses"></div>' +
-          '<span class="lab">Which tools</span><div class="chips" id="p-tools"></div><label class="lab" for="p-usetext">One thing that worked well, or didn’t (optional)</label><textarea id="p-usetext" placeholder="As long as you like"></textarea><button class="btn" type="button" id="p-usesend">Send</button><p class="sent" id="p-usenote"></p></section><div id="p-after"></div>';
+          '<span class="lab">Which tools</span><div class="chips" id="p-tools"></div><div id="p-otherbox" hidden><label class="lab" for="p-toolother">Which one?</label><input type="text" id="p-toolother" placeholder="Name the tool" maxlength="400"></div><label class="lab" for="p-usetext">One thing that worked well, or didn’t (optional)</label><textarea id="p-usetext" placeholder="As long as you like"></textarea><button class="btn" type="button" id="p-usesend">Send</button><p class="sent" id="p-usenote"></p></section><div id="p-after"></div>';
         var mu = parse((L.mine(i, 'use')[0] || {}).v, []), mt = parse((L.mine(i, 'tool')[0] || {}).v, []), mx2 = L.mine(i, 'usetext')[0];
         $('p-uses').innerHTML = C.USES.map(function (u, k) { return '<button type="button" class="chip" data-use="' + k + '" aria-pressed="' + (mu.indexOf(k) >= 0) + '">' + esc(u) + '</button>'; }).join('');
         $('p-tools').innerHTML = C.TOOLS.map(function (u, k) { return '<button type="button" class="chip" data-tool="' + k + '" aria-pressed="' + (mt.indexOf(k) >= 0) + '">' + esc(u) + '</button>'; }).join('');
         if (mx2) $('p-usetext').value = mx2.v;
+        var mo = L.mine(i, 'toolother')[0]; if (mo) $('p-toolother').value = mo.v;
+        $('p-otherbox').hidden = mt.indexOf(C.TOOLS.length - 1) < 0;
+        $('p-toolother').addEventListener('input', sendUses);
         P.refresh = function (reveal) {
           var a = $('p-after'), n = respondents(i, ['use', 'tool', 'usetext']);
           if (!L.level(i)) { a.innerHTML = ''; return; }
@@ -854,8 +890,8 @@
       case 'ideas': {
         main.innerHTML = '<section class="card pcard enter" id="p-ideacard">' + head + '<div id="p-gtag"></div><h2>' + esc(st.title) + '</h2><p>' + esc(st.prompt) + '</p>' +
           '<div class="bigclock" id="p-clock" hidden><div class="face" style="width:5rem;height:5rem">' + ring() + '<output style="bottom:.6rem;font-size:.95rem"></output></div><span class="note">Time left for your group</span></div>' +
-          '<form class="ideaform" id="p-ideaform" autocomplete="off"><label class="lab" for="p-ideat">Name your tool</label><input type="text" id="p-ideat" placeholder="e.g. a PBC chaser" maxlength="200">' +
-          '<label class="lab" for="p-ideaw">What problem does it solve?</label><textarea id="p-ideaw" placeholder="Write as much as you like"></textarea><button class="btn main" type="submit">Add idea</button></form>' +
+          '<form class="ideaform" id="p-ideaform" autocomplete="off"><label class="lab" for="p-ideat">What do you need?</label><input type="text" id="p-ideat" placeholder="e.g. one overview of open client requests" maxlength="300">' +
+          '<label class="lab" for="p-ideaw">Why doesn’t what we have today solve it?</label><textarea id="p-ideaw" placeholder="Write as much as you like"></textarea><button class="btn main" type="submit">Add</button></form>' +
           '<details><summary class="note">Stuck? Four questions</summary><ul class="small">' + C.SPARKS.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></details></section><div id="p-list"></div>';
         P.refresh = function () {
           var g = groupOf(s.me), list = ideas();
@@ -863,8 +899,8 @@
           var ownGroup = list.filter(function (x) { return x.g === g || x.mine; });
           var showAll = L.level(i) > 0;
           var shown = showAll ? list : ownGroup;
-          $('p-list').innerHTML = shown.length ? '<section class="card pcard"><span class="lab">' + (showAll ? 'All ideas' : 'Your group’s ideas') + '</span>' + shown.map(function (x) {
-            return '<div class="idea"><div><b>' + esc(x.t) + '</b>' + (x.w ? '<span>' + esc(x.w) + '</span>' : '') + '</div>' + (x.mine ? '<button class="x" type="button" data-del="' + esc(x.id) + '" aria-label="Remove">×</button>' : '') + '</div>';
+          $('p-list').innerHTML = shown.length ? '<section class="card pcard"><span class="lab">' + (showAll ? 'Everything the room raised' : 'Your group so far') + '</span>' + shown.map(function (x) {
+            return '<div class="idea"><div><b>' + esc(x.t) + '</b>' + (x.w ? '<span><em>Why not today:</em> ' + esc(x.w) + '</span>' : '') + '</div>' + (x.mine ? '<button class="x" type="button" data-del="' + esc(x.id) + '" aria-label="Remove">×</button>' : '') + '</div>';
           }).join('') + '</section>' : '';
           pClock();
         };
@@ -889,17 +925,26 @@
           $('p-ballot').innerHTML = list.length ? list.map(function (x) {
             var on = mine.indexOf(x.id) >= 0;
             return '<button type="button" class="vote" style="--g:' + gCol(x.g) + '" data-dot="' + esc(x.id) + '" aria-pressed="' + on + '"><span><span class="t">' + esc(x.t) + '</span>' + (x.w ? '<span class="w">' + esc(x.w.length > 140 ? x.w.slice(0, 140) + '…' : x.w) + '</span>' : '') + '</span><span class="pip" aria-hidden="true"></span></button>';
-          }).join('') : '<p class="note">No ideas yet.</p>';
+          }).join('') : '<p class="note">Nothing raised yet.</p>';
           $('p-after').innerHTML = '';
         };
         break;
+      case 'thanks':
+        main.innerHTML = '<section class="card pcard enter" style="text-align:center"><h2 style="font-size:2.25rem;color:var(--teal)">' + esc(st.title) + '</h2>' + tek(st.tek) + '<p>' + esc(st.prompt) + '</p><p class="note">You can close this page.</p></section>';
+        poppers(); buzz([30, 40, 30, 40, 60]);
+        P.refresh = function () {};
+        break;
       case 'close':
         main.innerHTML = '<section class="card pcard enter">' + head + '<h2>' + esc(st.title) + '</h2><p>' + esc(st.prompt) + '</p><span class="lab">Worth a follow-up session?</span><div class="chips" id="p-fu"></div>' +
-          '<span class="lab">What should it be about?</span><div class="chips" id="p-topics"></div>' + tek('close') + '</section><div id="p-after"></div>';
+          '<span class="lab">What should it be about?</span><div class="chips" id="p-topics"></div><div id="p-topicbox" hidden><label class="lab" for="p-topicother">What about?</label><textarea id="p-topicother" placeholder="Anything you’d like a session on"></textarea><button class="btn" type="button" id="p-topicsend">Send</button><p class="sent" id="p-topicnote"></p></div>' + tek('close') + '</section><div id="p-after"></div>';
+        var mto = L.mine(i, 'topicother')[0]; if (mto) $('p-topicother').value = mto.v;
         P.refresh = function (reveal) {
           var fu = (L.mine(i, 'fu')[0] || {}).v, tp = parse((L.mine(i, 'topic')[0] || {}).v, []);
           $('p-fu').innerHTML = [['yes', 'Yes'], ['maybe', 'Maybe'], ['no', 'No']].map(function (o) { return '<button type="button" class="chip" data-fu="' + o[0] + '" aria-pressed="' + (fu === o[0]) + '">' + o[1] + '</button>'; }).join('');
           $('p-topics').innerHTML = C.TOPICS.map(function (t, k) { return '<button type="button" class="chip" data-topic="' + k + '" aria-pressed="' + (tp.indexOf(k) >= 0) + '">' + esc(t) + '</button>'; }).join('');
+          var otherOn = tp.indexOf(C.TOPICS.length - 1) >= 0, box = $('p-topicbox');
+          if (box.hidden && otherOn) { box.hidden = false; if (document.activeElement && document.activeElement.hasAttribute('data-topic')) $('p-topicother').focus(); }
+          if (!otherOn) box.hidden = true;
           if (L.level(i)) {
             var f = { yes: 0, maybe: 0, no: 0 }; L.items(i, 'fu').forEach(function (it) { if (f[it.v] != null) f[it.v]++; });
             $('p-after').innerHTML = '<section class="card pcard' + (reveal ? ' enter' : '') + '"><span class="lab">The room</span>' + bars([{ label: 'Yes', n: f.yes }, { label: 'Maybe', n: f.maybe }, { label: 'No', n: f.no, col: 'var(--soft)' }], 0, {}) + '<p>Thank you for joining.</p></section>';
@@ -952,6 +997,8 @@
       document.querySelectorAll('#p-uses [aria-pressed="true"]').forEach(function (b) { u.push(+b.getAttribute('data-use')); });
       document.querySelectorAll('#p-tools [aria-pressed="true"]').forEach(function (b) { t.push(+b.getAttribute('data-tool')); });
       L.put(i, 'use', JSON.stringify(u)); L.put(i, 'tool', JSON.stringify(t));
+      var o = $('p-toolother'), had = (L.mine(i, 'toolother')[0] || {}).v || '', now = o && t.indexOf(C.TOOLS.length - 1) >= 0 ? o.value.trim() : '';
+      if (now !== had) L.put(i, 'toolother', now);
       var n = $('p-usenote'); if (n) n.textContent = 'Saved.';
     }, 700);
   }
@@ -969,7 +1016,9 @@
         if (on && k === none) document.querySelectorAll('#p-uses [data-use]').forEach(function (b) { b.setAttribute('aria-pressed', 'false'); });
         if (on && k !== none) { var nb = document.querySelector('#p-uses [data-use="' + none + '"]'); if (nb) nb.setAttribute('aria-pressed', 'false'); }
       }
-      t.setAttribute('aria-pressed', String(on)); sendUses(); return;
+      t.setAttribute('aria-pressed', String(on));
+      if (t.hasAttribute('data-tool') && +t.getAttribute('data-tool') === C.TOOLS.length - 1) { $('p-otherbox').hidden = !on; if (on) $('p-toolother').focus(); }
+      sendUses(); return;
     }
     if ((t = e.target.closest('[data-dot]'))) {
       var mine = parse((L.mine(i, 'dots')[0] || {}).v, []), id = t.getAttribute('data-dot'), at = mine.indexOf(id);
@@ -980,10 +1029,15 @@
     if ((t = e.target.closest('[data-topic]'))) {
       var tp = parse((L.mine(i, 'topic')[0] || {}).v, []), kk = +t.getAttribute('data-topic'), a = tp.indexOf(kk);
       if (a >= 0) tp.splice(a, 1); else tp.push(kk);
-      L.put(i, 'topic', JSON.stringify(tp)); return;
+      L.put(i, 'topic', JSON.stringify(tp));
+      if (kk === C.TOPICS.length - 1 && a >= 0 && (L.mine(i, 'topicother')[0] || {}).v) L.put(i, 'topicother', '');
+      return;
     }
     switch (e.target.id) {
       case 'p-place': if (P.pad) { L.put(i, 'xy', P.pad.x + ',' + P.pad.y); buzz(15); e.target.textContent = 'Move me here'; } break;
+      case 'p-topicsend': {
+        var tv = $('p-topicother').value.trim(); L.put(i, 'topicother', tv); $('p-topicnote').textContent = tv ? 'Sent, anonymously.' : 'Removed.'; break;
+      }
       case 'p-usesend': {
         var v = $('p-usetext').value.trim(); L.put(i, 'usetext', v); sendUses(); $('p-usenote').textContent = v ? 'Sent, anonymously.' : 'Saved.'; break;
       }
@@ -1011,9 +1065,9 @@
     } else if (e.target.id === 'p-ideaform') {
       e.preventDefault();
       var tt = $('p-ideat').value.trim(), ww = $('p-ideaw').value.trim();
-      if (!tt) { $('p-ideat').focus(); toast('Give your tool a name first'); return; }
+      if (!tt) { $('p-ideat').focus(); toast('Say in a few words what you need'); return; }
       L.add(i, 'idea', JSON.stringify({ g: groupOf(s.me), t: tt, w: ww }));
-      $('p-ideat').value = ''; $('p-ideaw').value = ''; toast('Idea added'); buzz(15);
+      $('p-ideat').value = ''; $('p-ideaw').value = ''; toast('Added for your group'); buzz(15);
     }
   });
   var pQueued = false;
